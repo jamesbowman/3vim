@@ -5,3 +5,4 @@ Todo:
 
 - [x] cursor and function keys
 - [ ] color
+- [ ] 2 column option
