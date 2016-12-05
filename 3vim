@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+"""
+    3vim
+    ~~~~
+
+    Run vim in triple-column
+
+    :copyright: (c) 2016 by James Bowman
+    :license: BSD, see LICENSE for more details.
+"""
+
+from __future__ import unicode_literals
+
+import os
+import pty
+import select
+import subprocess
+import sys
+import atexit
+import curses
+
+import pyte
+
+import locale
+locale.setlocale(locale.LC_ALL, '')
+
+if __name__ == "__main__":
+    win = curses.initscr()
+    atexit.register(curses.endwin)
+    (sy, sx) = win.getmaxyx()
+    ncols = 3
+    tw = sx / ncols
+
+    print (sx, sy)
+    stream = pyte.Stream()
+    screen = pyte.Screen(tw, ncols * sy)
+    stream.attach(screen)
+
+    os.environ[str('COLUMNS')] = str(tw)
+    os.environ[str('LINES')] = str(ncols * sy)
+    os.environ[str('TERM')] = "vt220"
+    master, slave = pty.openpty()
+    p = subprocess.Popen(["vim"] + sys.argv[1:], stdout=slave, stderr=slave)
+    while p.returncode is None:
+        (r,_,_) = select.select([master], [], [master, slave], .02)
+        if r:
+            d = os.read(master, 4096)
+            stream.feed(unicode(d, 'utf-8'))
+            # print "\n".join(screen.display)
+            for i,l in enumerate(screen.display):
+                win.addstr(i % sy, (i / sy) * tw, l[:tw - 1].encode('utf-8'))
+            
+            col = (screen.cursor.y / sy)
+            win.move(screen.cursor.y % sy, tw * col + screen.cursor.x)
+            win.refresh()
+        else:
+            p.poll()
