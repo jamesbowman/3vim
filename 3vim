@@ -17,6 +17,7 @@ import select
 import subprocess
 import sys
 import atexit
+import time
 import curses
 
 import pyte
@@ -31,10 +32,13 @@ if __name__ == "__main__":
     ncols = 3
     tw = sx / ncols
 
-    print (sx, sy)
+    log = open("log", "w")
     stream = pyte.Stream()
-    screen = pyte.Screen(tw, ncols * sy)
+    screen = pyte.DiffScreen(tw, ncols * sy)
     stream.attach(screen)
+    if 0:
+        print "hello", screen.buffer[0][0]
+        sys.exit(0)
 
     os.environ[str('COLUMNS')] = str(tw)
     os.environ[str('LINES')] = str(ncols * sy)
@@ -47,14 +51,28 @@ if __name__ == "__main__":
     while p.returncode is None:
         (r,_,_) = select.select([master], [], [master, slave], .02)
         if r:
-            d = os.read(master, 4096)
+            d = os.read(master, 65536)
             stream.feed(unicode(d, 'utf-8'))
             # print "\n".join(screen.display)
-            for i,l in enumerate(screen.display):
-                win.addstr(i % sy, (i / sy) * tw, l[:tw - 1].encode('utf-8'))
-            
+            dl = list(screen.display)
+            db = list(screen.buffer)
+            for i in screen.dirty:
+                # l = dl[i]
+                # win.addstr(i % sy, (i / sy) * tw, l[:tw - 1].encode('utf-8'))
+                l = db[i]
+                win.move(i % sy, (i / sy) * tw)
+                for c in l[:-1]:
+                    attr = 0
+                    if c.reverse:
+                        attr |= curses.A_REVERSE
+                    win.addch(c.data.encode('utf-8'), attr)
+            screen.dirty = set()
             col = (screen.cursor.y / sy)
-            win.move(screen.cursor.y % sy, tw * col + screen.cursor.x)
+            cy = screen.cursor.y % sy
+            cx = tw * col + min(tw - 1, screen.cursor.x)
+            print >>log, "%r %d %d" % ((screen.cursor.x, screen.cursor.y, sx, sy, tw, col), cx, cy)
+            if cy != (sy - 1) or cx != (sx - 1):
+              win.move(cy, cx)
             win.refresh()
         else:
             p.poll()
