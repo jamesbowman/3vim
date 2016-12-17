@@ -40,7 +40,10 @@ if __name__ == "__main__":
     os.environ[str('LINES')] = str(ncols * sy)
     os.environ[str('TERM')] = "vt220"
     master, slave = pty.openpty()
-    p = subprocess.Popen(["vim"] + sys.argv[1:], stdout=slave, stderr=slave)
+    commands = [
+      "hi IncSearch term=reverse"
+    ]
+    p = subprocess.Popen(["vim"] + ["+" + c for c in commands] + sys.argv[1:], stdout=slave, stderr=slave)
     while p.returncode is None:
         (r,_,_) = select.select([master], [], [master, slave], .02)
         if r:
